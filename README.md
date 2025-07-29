@@ -39,6 +39,7 @@ Templates are named blueprints—predefined sets of fields, layouts, and styling
 
 For example, the following json:
 
+```json
 {  
   "type": "ui.render",  
   "component": "bugReportForm",  
@@ -56,6 +57,8 @@ For example, the following json:
     \]  
   }  
 }
+```
+
 
 Would result in the display of this form: 
 
@@ -108,33 +111,33 @@ Below is a full **MondrUI DSL example** describing a ChatGPT-like conversational
 ## For example, the following json:
 
 
-
+```json
 {  
   "type": "ui.render",  
   "component": "Container",  
   "props": {  
     "direction": "vertical",  
-    "children": \[  
+    "children": [  
       {  
         "component": "Header",  
         "props": {  
           "title": "MondrUI Chat",  
-          "actions": \[  
+          "actions": [  
             { "icon": "settings", "action": "openSettings" }  
-          \]  
+          ]  
         }  
       },  
       {  
         "component": "Container",  
         "props": {  
           "direction": "horizontal",  
-          "children": \[  
+          "children": [  
             {  
               "component": "Sidebar",  
               "props": {  
                 "direction": "vertical",  
                 "width": "240px",  
-                "children": \[  
+                "children": [  
                   {  
                     "component": "Button",  
                     "props": {  
@@ -153,12 +156,12 @@ Below is a full **MondrUI DSL example** describing a ChatGPT-like conversational
                   {  
                     "component": "List",  
                     "props": {  
-                      "data": "@get\_conversation\_list",  
+                      "data": "@get_conversation_list",  
                       "itemComponent": "ConversationListItem",  
                       "emptyMessage": "No conversations found"  
                     }  
                   }  
-                \]  
+                ]  
               }  
             },  
             {  
@@ -166,7 +169,7 @@ Below is a full **MondrUI DSL example** describing a ChatGPT-like conversational
               "props": {  
                 "direction": "vertical",  
                 "grow": true,  
-                "children": \[  
+                "children": [  
                   {  
                     "component": "ChatHistory",  
                     "props": {  
@@ -184,16 +187,16 @@ Below is a full **MondrUI DSL example** describing a ChatGPT-like conversational
                       "placeholder": "Type your message..."  
                     }  
                   }  
-                \]  
+                ]  
               }  
             }  
-          \]  
+          ]  
         }  
       }  
-    \]  
+    ]  
   }  
 }
-
+```
 
 
 Would result in the display of this window:

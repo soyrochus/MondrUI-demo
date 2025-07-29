@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from langchain_openai import ChatOpenAI
+from ai import AIAgent
 from log_callback_handler import NiceGuiLogElementCallbackHandler
 from dotenv import load_dotenv
 from nicegui import ui
@@ -11,7 +11,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
 @ui.page('/')
 def main():
-    llm = ChatOpenAI(model='gpt-4o-mini', streaming=True, api_key=OPENAI_API_KEY)
+    ai_agent = AIAgent(model='gpt-4o-mini')
 
     async def send() -> None:
         question = text.value
@@ -23,13 +23,20 @@ def main():
             spinner = ui.spinner(type='dots')
 
         response = ''
-        async for chunk in llm.astream(question, config={'callbacks': [NiceGuiLogElementCallbackHandler(log)]}):
-            response += chunk.content
+        async for chunk in ai_agent.send_message(question, NiceGuiLogElementCallbackHandler(log)):
+            response += chunk
             response_message.clear()
             with response_message:
                 ui.html(response)
             ui.run_javascript('window.scrollTo(0, document.body.scrollHeight)')
         message_container.remove(spinner)
+
+    async def new_chat() -> None:
+        """Start a new conversation by clearing memory."""
+        ai_agent.clear_memory()
+        message_container.clear()
+        with message_container:
+            ui.markdown("*Conversation cleared. Starting fresh!*").classes('text-gray-500 italic')
 
     ui.add_css(r'a:link, a:visited {color: inherit !important; text-decoration: none; font-weight: 500}')
 
@@ -40,19 +47,44 @@ def main():
     with ui.tabs().classes('w-full') as tabs:
         chat_tab = ui.tab('Chat')
         logs_tab = ui.tab('Logs')
+        memory_tab = ui.tab('Memory')
     with ui.tab_panels(tabs, value=chat_tab).classes('w-full max-w-2xl mx-auto flex-grow items-stretch'):
         message_container = ui.tab_panel(chat_tab).classes('items-stretch')
         with ui.tab_panel(logs_tab):
             log = ui.log().classes('w-full h-full')
+        with ui.tab_panel(memory_tab).classes('p-4'):
+            ui.label('Conversation Memory').classes('text-lg font-bold mb-4')
+            memory_display = ui.column().classes('w-full')
+            
+            def update_memory_display():
+                memory_display.clear()
+                with memory_display:
+                    messages = ai_agent.get_conversation_history()
+                    if not messages:
+                        ui.label('No conversation history').classes('text-gray-500 italic')
+                    else:
+                        ui.label(f'Total messages: {len(messages)}').classes('text-sm text-gray-600 mb-2')
+                        for i, msg in enumerate(messages):
+                            with ui.card().classes('mb-2 p-3'):
+                                if hasattr(msg, 'type'):
+                                    msg_type = "Human" if msg.type == "human" else "AI"
+                                else:
+                                    msg_type = "Human" if i % 2 == 0 else "AI"
+                                ui.label(f'{msg_type}:').classes('font-bold text-sm')
+                                ui.markdown(str(msg.content)).classes('mt-1')
+            
+            ui.button('Refresh Memory View', on_click=update_memory_display).classes('mb-4')
+            ui.button('Clear Conversation', on_click=new_chat).classes('mb-4 bg-red-500')
 
     with ui.footer().classes('bg-white'), ui.column().classes('w-full max-w-3xl mx-auto my-6'):
         with ui.row().classes('w-full no-wrap items-center'):
+            ui.button('New Chat', on_click=new_chat).classes('mr-2').props('flat color=primary')
             placeholder = 'message' if OPENAI_API_KEY != 'not-set' else \
                 'Please provide your OPENAI key in the Python script first!'
             text = ui.input(placeholder=placeholder).props('rounded outlined input-class=mx-3') \
                 .classes('w-full self-center').on('keydown.enter', send)
-        ui.markdown('simple chat app built with [NiceGUI](https://nicegui.io)') \
+        ui.markdown('MondrUI demo with conversational memory - built with [NiceGUI](https://nicegui.io)') \
             .classes('text-xs self-end mr-8 m-[-1em] text-primary')
 
 
-ui.run(title='Chat with GPT-3 (example)')
+ui.run(title='MondrUI Demo - Conversational AI with Memory')
