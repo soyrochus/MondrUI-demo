@@ -1,264 +1,521 @@
 #!/usr/bin/env python3
 """
-MondrUI: Dynamic UI Rendering Engine
+MondrUI: Truly Generic Dynamic UI Rendering Engine
 
-This module implements the core MondrUI functionality for dynamically
-generating NiceGUI component trees from JSON specifications.
+This module implements a generic, extensible UI rendering system that can
+dynamically generate NiceGUI component trees from JSON specifications.
 """
 
 from nicegui import ui
-from typing import Dict, Any, List, Optional, Callable
+from typing import Dict, Any, List, Optional, Callable, Type, Union
 import json
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from enum import Enum
 
 
-class MondrUIRenderer:
-    """Core renderer for MondrUI specifications."""
+class LayoutType(Enum):
+    """Standard layout types."""
+    VERTICAL = "vertical"
+    HORIZONTAL = "horizontal"
+    GRID = "grid"
+    FLEX = "flex"
+
+
+class EventType(Enum):
+    """Standard event types."""
+    CLICK = "click"
+    CHANGE = "change"
+    SUBMIT = "submit"
+    KEYDOWN = "keydown"
+    FOCUS = "focus"
+    BLUR = "blur"
+
+
+@dataclass
+class ComponentStyle:
+    """Standardized styling properties."""
+    classes: List[str] = field(default_factory=list)
+    width: Optional[str] = None
+    height: Optional[str] = None
+    padding: Optional[str] = None
+    margin: Optional[str] = None
+    background: Optional[str] = None
+    color: Optional[str] = None
+    border: Optional[str] = None
     
-    def __init__(self):
-        """Initialize the MondrUI renderer with component registry."""
-        self.component_registry = {
-            'bugReportForm': self._render_bug_report_form,
-            'Container': self._render_container,
-            'Header': self._render_header,
-            'Sidebar': self._render_sidebar,
-            'Button': self._render_button,
-            'Input': self._render_input,
-            'List': self._render_list,
-            'ChatHistory': self._render_chat_history,
-            'Divider': self._render_divider,
-            'ChatInput': self._render_chat_input,
-        }
-        self.action_handlers = {}
+    def apply_to_element(self, element) -> None:
+        """Apply styles to a NiceGUI element."""
+        if self.classes:
+            element.classes(' '.join(self.classes))
+        
+        style_dict = {}
+        if self.width: style_dict['width'] = self.width
+        if self.height: style_dict['height'] = self.height
+        if self.padding: style_dict['padding'] = self.padding
+        if self.margin: style_dict['margin'] = self.margin
+        if self.background: style_dict['background'] = self.background
+        if self.color: style_dict['color'] = self.color
+        if self.border: style_dict['border'] = self.border
+        
+        if style_dict:
+            element.style(style_dict)
+
+
+@dataclass
+class EventHandler:
+    """Standardized event handling."""
+    event: EventType
+    action: str
+    params: Dict[str, Any] = field(default_factory=dict)
+
+
+class BaseComponent(ABC):
+    """Abstract base class for all MondrUI components."""
     
-    def register_action_handler(self, action: str, handler: Callable):
-        """Register a handler for a specific action."""
-        self.action_handlers[action] = handler
+    def __init__(self, component_type: str, props: Dict[str, Any]):
+        self.type = component_type
+        self.props = props
+        self.style = self._parse_style(props.get('style', {}))
+        self.events = self._parse_events(props.get('events', {}))
+        self.children = props.get('children', [])
+        
+    def _parse_style(self, style_props: Dict[str, Any]) -> ComponentStyle:
+        """Parse style properties into ComponentStyle object."""
+        return ComponentStyle(
+            classes=style_props.get('classes', []),
+            width=style_props.get('width'),
+            height=style_props.get('height'),
+            padding=style_props.get('padding'),
+            margin=style_props.get('margin'),
+            background=style_props.get('background'),
+            color=style_props.get('color'),
+            border=style_props.get('border')
+        )
     
-    def render_ui(self, spec: Dict[str, Any]) -> Any:
-        """
-        Render a UI component tree from a MondrUI specification.
-        
-        Args:
-            spec: The MondrUI JSON specification
-            
-        Returns:
-            The root NiceGUI component
-        """
-        if spec.get('type') != 'ui.render':
-            raise ValueError("Specification must have type 'ui.render'")
-        
-        component_name = spec.get('component')
-        if not component_name:
-            raise ValueError("Specification must include a component name")
-        
-        props = spec.get('props', {})
-        
-        # Get the renderer for this component
-        renderer = self.component_registry.get(component_name)
-        if not renderer:
-            raise ValueError(f"Unknown component: {component_name}")
-        
-        return renderer(props)
+    def _parse_events(self, event_props: Dict[str, Any]) -> List[EventHandler]:
+        """Parse event properties into EventHandler objects."""
+        events = []
+        for event_name, action in event_props.items():
+            try:
+                event_type = EventType(event_name.lower())
+                if isinstance(action, str):
+                    events.append(EventHandler(event_type, action))
+                elif isinstance(action, dict):
+                    events.append(EventHandler(
+                        event_type, 
+                        action.get('action', ''),
+                        action.get('params', {})
+                    ))
+            except ValueError:
+                # Skip unknown event types
+                pass
+        return events
     
-    def _render_bug_report_form(self, props: Dict[str, Any]) -> Any:
-        """Render a bug report form template."""
-        title = props.get('title', 'Bug Report')
-        fields = props.get('fields', [])
-        actions = props.get('actions', [])
+    @abstractmethod
+    def render(self, renderer: 'MondrUIRenderer') -> Any:
+        """Render the component and return the NiceGUI element."""
+        pass
+    
+    def validate_props(self) -> bool:
+        """Validate component properties. Override in subclasses."""
+        return True
+    
+    def apply_styling_and_events(self, element: Any, renderer: 'MondrUIRenderer') -> None:
+        """Apply styling and event handlers to the rendered element."""
+        self.style.apply_to_element(element)
         
-        with ui.card().classes('max-w-md mx-auto p-6') as form_card:
-            # Title
-            ui.label(title).classes('text-xl font-bold mb-4')
-            
-            # Form fields
-            form_data = {}
-            for field in fields:
-                field_id = field.get('id', '')
-                label = field.get('label', '')
-                field_type = field.get('type', 'text')
-                required = field.get('required', False)
-                options = field.get('options', [])
+        for event in self.events:
+            if event.action in renderer.action_handlers:
+                handler = renderer.action_handlers[event.action]
                 
-                # Label with required indicator
-                label_text = f"{label}{'*' if required else ''}"
-                ui.label(label_text).classes('text-sm font-medium mb-1')
-                
-                # Create appropriate input component
-                if field_type == 'text':
-                    form_data[field_id] = ui.input().classes('w-full mb-3')
-                elif field_type == 'textarea':
-                    form_data[field_id] = ui.textarea().classes('w-full mb-3')
-                elif field_type == 'select':
-                    form_data[field_id] = ui.select(options).classes('w-full mb-3')
-                
-                # Set required validation
-                if required and field_id in form_data:
-                    form_data[field_id].props('required')
-            
-            # Action buttons
-            if actions:
-                with ui.row().classes('w-full justify-end mt-4 gap-2'):
-                    for action in actions:
-                        action_id = action.get('id', '')
-                        label = action.get('label', '')
-                        action_type = action.get('type', 'button')
-                        target = action.get('target', '')
-                        
-                        if action_type == 'submit':
-                            btn = ui.button(label).classes('bg-blue-500 text-white')
-                        elif action_type == 'cancel':
-                            btn = ui.button(label).classes('bg-gray-500 text-white')
-                        else:
-                            btn = ui.button(label)
-                        
-                        # Register click handler if target is specified
-                        if target and target in self.action_handlers:
-                            btn.on('click', lambda t=target: self.action_handlers[t]())
-        
-        return form_card
+                if event.event == EventType.CLICK:
+                    element.on('click', lambda h=handler, p=event.params: h(**p))
+                elif event.event == EventType.CHANGE:
+                    element.on('change', lambda h=handler, p=event.params: h(element.value, **p))
+                elif event.event == EventType.SUBMIT:
+                    element.on('submit', lambda h=handler, p=event.params: h(**p))
+                # Add more event types as needed
+
+
+class ContainerComponent(BaseComponent):
+    """Generic container component with flexible layout."""
     
-    def _render_container(self, props: Dict[str, Any]) -> Any:
-        """Render a container component."""
-        direction = props.get('direction', 'vertical')
-        children = props.get('children', [])
-        grow = props.get('grow', False)
-        width = props.get('width', None)
+    def render(self, renderer: 'MondrUIRenderer') -> Any:
+        layout = self.props.get('layout', LayoutType.VERTICAL.value)
         
-        if direction == 'horizontal':
+        if layout == LayoutType.HORIZONTAL.value:
             container = ui.row()
-        else:
+        elif layout == LayoutType.GRID.value:
+            container = ui.grid(columns=self.props.get('columns', 2))
+        else:  # Default to vertical
             container = ui.column()
         
-        if grow:
-            container.classes('flex-grow')
-        
-        if width:
-            container.style(f'width: {width}')
+        self.apply_styling_and_events(container, renderer)
         
         # Render children
         with container:
-            for child in children:
-                self._render_component(child)
+            for child_spec in self.children:
+                renderer.render_component(child_spec)
         
         return container
+
+
+class TextComponent(BaseComponent):
+    """Generic text component (labels, headings, etc.)."""
     
-    def _render_header(self, props: Dict[str, Any]) -> Any:
-        """Render a header component."""
-        title = props.get('title', '')
-        actions = props.get('actions', [])
+    def render(self, renderer: 'MondrUIRenderer') -> Any:
+        text = self.props.get('text', '')
+        variant = self.props.get('variant', 'body')  # body, h1, h2, h3, caption
         
-        with ui.header().classes('flex justify-between items-center') as header:
-            ui.label(title).classes('text-lg font-bold')
+        if variant.startswith('h'):
+            element = ui.html(f'<{variant}>{text}</{variant}>')
+        elif variant == 'caption':
+            element = ui.label(text).classes('text-sm text-gray-500')
+        else:
+            element = ui.label(text)
+        
+        self.apply_styling_and_events(element, renderer)
+        return element
+
+
+class InputComponent(BaseComponent):
+    """Generic input component supporting various input types."""
+    
+    def render(self, renderer: 'MondrUIRenderer') -> Any:
+        input_type = self.props.get('inputType', 'text')
+        placeholder = self.props.get('placeholder', '')
+        value = self.props.get('value', '')
+        required = self.props.get('required', False)
+        options = self.props.get('options', [])
+        
+        if input_type == 'textarea':
+            element = ui.textarea(value=value, placeholder=placeholder)
+        elif input_type == 'select':
+            element = ui.select(options=options, value=value)
+        elif input_type == 'checkbox':
+            element = ui.checkbox(value=bool(value))
+        elif input_type == 'number':
+            element = ui.number(value=value, placeholder=placeholder)
+        else:  # Default to text
+            element = ui.input(value=value, placeholder=placeholder)
+        
+        if required:
+            element.props('required')
+        
+        self.apply_styling_and_events(element, renderer)
+        return element
+
+
+class ButtonComponent(BaseComponent):
+    """Generic button component."""
+    
+    def render(self, renderer: 'MondrUIRenderer') -> Any:
+        label = self.props.get('label', '')
+        icon = self.props.get('icon')
+        variant = self.props.get('variant', 'default')  # default, primary, secondary, danger
+        
+        element = ui.button(label, icon=icon)
+        
+        # Apply variant-specific styling
+        if variant == 'primary':
+            element.classes('bg-blue-500 text-white')
+        elif variant == 'secondary':
+            element.classes('bg-gray-500 text-white')
+        elif variant == 'danger':
+            element.classes('bg-red-500 text-white')
+        
+        self.apply_styling_and_events(element, renderer)
+        return element
+
+
+class FormComponent(BaseComponent):
+    """Generic form component that can render any form structure."""
+    
+    def render(self, renderer: 'MondrUIRenderer') -> Any:
+        title = self.props.get('title', '')
+        fields = self.props.get('fields', [])
+        actions = self.props.get('actions', [])
+        layout = self.props.get('layout', 'vertical')
+        
+        with ui.card() as form_card:
+            if title:
+                ui.label(title).classes('text-xl font-bold mb-4')
             
+            # Create form layout
+            if layout == 'horizontal':
+                field_container = ui.row()
+            else:
+                field_container = ui.column()
+            
+            with field_container:
+                # Render form fields
+                for field in fields:
+                    self._render_form_field(field, renderer)
+            
+            # Render action buttons
             if actions:
-                with ui.row():
+                with ui.row().classes('w-full justify-end mt-4 gap-2'):
                     for action in actions:
-                        icon = action.get('icon', '')
-                        action_name = action.get('action', '')
-                        btn = ui.button(icon=icon)
-                        if action_name in self.action_handlers:
-                            btn.on('click', self.action_handlers[action_name])
+                        action_spec = {
+                            'component': 'Button',
+                            'props': {
+                                'label': action.get('label', ''),
+                                'variant': action.get('variant', 'default'),
+                                'events': {
+                                    'click': action.get('action', '')
+                                }
+                            }
+                        }
+                        renderer.render_component(action_spec)
         
-        return header
+        self.apply_styling_and_events(form_card, renderer)
+        return form_card
     
-    def _render_sidebar(self, props: Dict[str, Any]) -> Any:
-        """Render a sidebar component."""
-        direction = props.get('direction', 'vertical')
-        width = props.get('width', '240px')
-        children = props.get('children', [])
+    def _render_form_field(self, field: Dict[str, Any], renderer: 'MondrUIRenderer') -> None:
+        """Render a single form field with label."""
+        label = field.get('label', '')
+        required = field.get('required', False)
+        field_id = field.get('id', '')
         
-        with ui.column().style(f'width: {width}').classes('bg-gray-100 p-4') as sidebar:
-            for child in children:
-                self._render_component(child)
+        # Render label
+        label_text = f"{label}{'*' if required else ''}"
+        ui.label(label_text).classes('text-sm font-medium mb-1')
         
-        return sidebar
+        # Render input field
+        input_spec = {
+            'component': 'Input',
+            'props': {
+                'inputType': field.get('type', 'text'),
+                'placeholder': field.get('placeholder', ''),
+                'required': required,
+                'options': field.get('options', []),
+                'style': {'classes': ['w-full', 'mb-3']}
+            }
+        }
+        
+        if field_id:
+            input_spec['props']['id'] = field_id
+        
+        renderer.render_component(input_spec)
+
+
+class CardComponent(BaseComponent):
+    """Generic card component."""
     
-    def _render_button(self, props: Dict[str, Any]) -> Any:
-        """Render a button component."""
-        label = props.get('label', '')
-        icon = props.get('icon', '')
-        on_click = props.get('onClick', '')
+    def render(self, renderer: 'MondrUIRenderer') -> Any:
+        title = self.props.get('title')
         
-        btn = ui.button(label, icon=icon if icon else None)
+        card = ui.card()
         
-        if on_click and on_click in self.action_handlers:
-            btn.on('click', self.action_handlers[on_click])
+        with card:
+            if title:
+                ui.label(title).classes('text-lg font-bold mb-2')
+            
+            # Render children
+            for child_spec in self.children:
+                renderer.render_component(child_spec)
         
-        return btn
+        self.apply_styling_and_events(card, renderer)
+        return card
+
+
+class ListComponent(BaseComponent):
+    """Generic list component."""
     
-    def _render_input(self, props: Dict[str, Any]) -> Any:
-        """Render an input component."""
-        placeholder = props.get('placeholder', '')
-        on_change = props.get('onChange', '')
-        
-        input_field = ui.input(placeholder=placeholder)
-        
-        if on_change and on_change in self.action_handlers:
-            input_field.on('change', self.action_handlers[on_change])
-        
-        return input_field
-    
-    def _render_list(self, props: Dict[str, Any]) -> Any:
-        """Render a list component."""
-        data = props.get('data', [])
-        item_component = props.get('itemComponent', '')
-        empty_message = props.get('emptyMessage', 'No items')
+    def render(self, renderer: 'MondrUIRenderer') -> Any:
+        items = self.props.get('items', [])
+        item_template = self.props.get('itemTemplate', {})
+        empty_message = self.props.get('emptyMessage', 'No items')
         
         with ui.column() as list_container:
-            if not data:
+            if not items:
                 ui.label(empty_message).classes('text-gray-500 italic')
             else:
-                for item in data:
-                    # For now, render as simple list items
-                    ui.label(str(item))
+                for item in items:
+                    if item_template:
+                        # Merge item data with template
+                        item_spec = self._merge_item_with_template(item, item_template)
+                        renderer.render_component(item_spec)
+                    else:
+                        # Default to simple text representation
+                        ui.label(str(item))
         
+        self.apply_styling_and_events(list_container, renderer)
         return list_container
     
-    def _render_chat_history(self, props: Dict[str, Any]) -> Any:
-        """Render a chat history component."""
-        messages = props.get('messages', [])
+    def _merge_item_with_template(self, item: Any, template: Dict[str, Any]) -> Dict[str, Any]:
+        """Merge item data with template specification."""
+        # Simple template variable replacement
+        spec = json.loads(json.dumps(template))  # Deep copy
         
-        with ui.column().classes('flex-grow overflow-auto') as chat_container:
-            for message in messages:
-                ui.chat_message(message.get('text', ''), 
-                              name=message.get('name', 'User'),
-                              sent=message.get('sent', False))
+        def replace_variables(obj):
+            if isinstance(obj, str) and obj.startswith('{{') and obj.endswith('}}'):
+                var_name = obj[2:-2].strip()
+                return item.get(var_name, obj) if isinstance(item, dict) else str(item)
+            elif isinstance(obj, dict):
+                return {k: replace_variables(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [replace_variables(v) for v in obj]
+            return obj
         
-        return chat_container
+        result = replace_variables(spec)
+        # Ensure we return a dictionary
+        if not isinstance(result, dict):
+            return {'component': 'Text', 'props': {'text': str(result)}}
+        return result
+
+
+class MondrUIRenderer:
+    """Generic, extensible UI renderer."""
     
-    def _render_divider(self, props: Dict[str, Any]) -> Any:
-        """Render a divider component."""
-        margin = props.get('margin', 'sm')
-        margin_class = f'm-{margin}' if margin else ''
+    def __init__(self):
+        """Initialize with standard component registry."""
+        self.component_registry: Dict[str, Type[BaseComponent]] = {
+            'Container': ContainerComponent,
+            'Text': TextComponent,
+            'Input': InputComponent,
+            'Button': ButtonComponent,
+            'Form': FormComponent,
+            'Card': CardComponent,
+            'List': ListComponent,
+        }
         
-        return ui.separator().classes(margin_class)
+        # Register template components
+        self.template_registry: Dict[str, Dict[str, Any]] = {}
+        self._register_builtin_templates()
+        
+        self.action_handlers: Dict[str, Callable] = {}
+        self.theme: Dict[str, Any] = self._default_theme()
     
-    def _render_chat_input(self, props: Dict[str, Any]) -> Any:
-        """Render a chat input component."""
-        placeholder = props.get('placeholder', 'Type a message...')
-        on_send = props.get('onSend', '')
-        
-        with ui.row().classes('w-full') as input_row:
-            text_input = ui.input(placeholder=placeholder).classes('flex-grow')
-            send_btn = ui.button('Send')
-            
-            if on_send and on_send in self.action_handlers:
-                send_btn.on('click', lambda: self.action_handlers[on_send](text_input.value))
-                text_input.on('keydown.enter', lambda: self.action_handlers[on_send](text_input.value))
-        
-        return input_row
+    def _default_theme(self) -> Dict[str, Any]:
+        """Default theme configuration."""
+        return {
+            'colors': {
+                'primary': '#007bff',
+                'secondary': '#6c757d',
+                'success': '#28a745',
+                'danger': '#dc3545',
+                'warning': '#ffc107',
+                'info': '#17a2b8'
+            },
+            'spacing': {
+                'xs': '0.25rem',
+                'sm': '0.5rem',
+                'md': '1rem',
+                'lg': '1.5rem',
+                'xl': '2rem'
+            },
+            'typography': {
+                'fontFamily': 'Inter, sans-serif',
+                'fontSize': '14px',
+                'lineHeight': '1.5'
+            }
+        }
     
-    def _render_component(self, component_spec: Dict[str, Any]) -> Any:
-        """Render a child component from its specification."""
-        component_name = component_spec.get('component', '')
-        props = component_spec.get('props', {})
+    def _register_builtin_templates(self):
+        """Register built-in component templates."""
+        # Bug report form template
+        self.template_registry['bugReportForm'] = {
+            'component': 'Form',
+            'props': {
+                'title': '{{title}}',
+                'fields': '{{fields}}',
+                'actions': '{{actions}}',
+                'style': {
+                    'classes': ['max-w-md', 'mx-auto', 'p-6']
+                }
+            }
+        }
         
-        renderer = self.component_registry.get(component_name)
-        if not renderer:
-            # Fallback: render as label with component name
-            return ui.label(f"Unknown component: {component_name}")
+        # Chat interface template
+        self.template_registry['chatInterface'] = {
+            'component': 'Container',
+            'props': {
+                'layout': 'vertical',
+                'children': [
+                    {
+                        'component': 'Container',
+                        'props': {
+                            'layout': 'horizontal',
+                            'children': '{{children}}'
+                        }
+                    }
+                ]
+            }
+        }
+    
+    def register_component(self, name: str, component_class: Type[BaseComponent]):
+        """Register a new component type."""
+        if not issubclass(component_class, BaseComponent):
+            raise ValueError("Component must inherit from BaseComponent")
+        self.component_registry[name] = component_class
+    
+    def register_template(self, name: str, template_spec: Dict[str, Any]):
+        """Register a new template."""
+        self.template_registry[name] = template_spec
+    
+    def register_action_handler(self, action: str, handler: Callable):
+        """Register an action handler."""
+        self.action_handlers[action] = handler
+    
+    def set_theme(self, theme: Dict[str, Any]):
+        """Set custom theme."""
+        self.theme.update(theme)
+    
+    def render_ui(self, spec: Dict[str, Any]) -> Any:
+        """Render a UI component tree from specification."""
+        if spec.get('type') != 'ui.render':
+            raise ValueError("Specification must have type 'ui.render'")
         
-        return renderer(props)
+        return self.render_component(spec)
+    
+    def render_component(self, spec: Dict[str, Any]) -> Any:
+        """Render a single component from specification."""
+        component_name = spec.get('component')
+        if not component_name:
+            raise ValueError("Component specification must include component name")
+        
+        props = spec.get('props', {})
+        
+        # Check if this is a template
+        if component_name in self.template_registry:
+            template_spec = self._expand_template(component_name, props)
+            return self.render_component(template_spec)
+        
+        # Get component class
+        component_class = self.component_registry.get(component_name)
+        if not component_class:
+            raise ValueError(f"Unknown component: {component_name}")
+        
+        # Create and render component
+        component = component_class(component_name, props)
+        
+        if not component.validate_props():
+            raise ValueError(f"Invalid properties for component: {component_name}")
+        
+        return component.render(self)
+    
+    def _expand_template(self, template_name: str, props: Dict[str, Any]) -> Dict[str, Any]:
+        """Expand a template with provided properties."""
+        template = self.template_registry[template_name]
+        
+        # Simple variable replacement
+        def replace_variables(obj):
+            if isinstance(obj, str) and obj.startswith('{{') and obj.endswith('}}'):
+                var_name = obj[2:-2].strip()
+                return props.get(var_name, obj)
+            elif isinstance(obj, dict):
+                return {k: replace_variables(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [replace_variables(v) for v in obj]
+            return obj
+        
+        result = replace_variables(template)
+        # Ensure we return a dictionary
+        if not isinstance(result, dict):
+            raise ValueError(f"Template {template_name} must expand to a dictionary")
+        return result
 
 
 # Global renderer instance
@@ -266,16 +523,18 @@ _renderer = MondrUIRenderer()
 
 
 def render_ui(spec: Dict[str, Any]) -> Any:
-    """
-    Main function to render a UI component tree from a MondrUI specification.
-    
-    Args:
-        spec: The MondrUI JSON specification
-        
-    Returns:
-        The root NiceGUI component
-    """
+    """Render a UI component tree from a MondrUI specification."""
     return _renderer.render_ui(spec)
+
+
+def register_component(name: str, component_class: Type[BaseComponent]):
+    """Register a new component type globally."""
+    _renderer.register_component(name, component_class)
+
+
+def register_template(name: str, template_spec: Dict[str, Any]):
+    """Register a new template globally."""
+    _renderer.register_template(name, template_spec)
 
 
 def register_action_handler(action: str, handler: Callable):
@@ -283,18 +542,28 @@ def register_action_handler(action: str, handler: Callable):
     _renderer.register_action_handler(action, handler)
 
 
+def set_theme(theme: Dict[str, Any]):
+    """Set global theme."""
+    _renderer.set_theme(theme)
+
+
 def parse_and_render(json_str: str) -> Any:
-    """
-    Parse a JSON string and render the UI component.
-    
-    Args:
-        json_str: JSON string containing MondrUI specification
-        
-    Returns:
-        The root NiceGUI component
-    """
+    """Parse JSON string and render UI component."""
     try:
         spec = json.loads(json_str)
         return render_ui(spec)
     except json.JSONDecodeError as e:
         raise ValueError(f"Invalid JSON: {e}")
+
+
+# Utility function to create custom components easily
+def create_component(render_func: Callable) -> Type[BaseComponent]:
+    """Create a component class from a render function."""
+    
+    class CustomComponent(BaseComponent):
+        def render(self, renderer: MondrUIRenderer) -> Any:
+            element = render_func(self.props, renderer)
+            self.apply_styling_and_events(element, renderer)
+            return element
+    
+    return CustomComponent

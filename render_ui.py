@@ -1,65 +1,18 @@
 #!/usr/bin/env python3
 """
-MondrUI Render Test
-
-This script demonstrates the MondrUI rendering system by actually rendering
-the bug report form and other components for visual testing.
+MondrUI visual demos and examples.
+This module demonstrates the generic MondrUI rendering capabilities.
 """
 
-from nicegui import ui
-from mondrui import render_ui, register_action_handler
-import json
+import asyncio
+from nicegui import ui, app
+from mondrui import render_ui
 
 
-# Sample action handlers for testing
-def handle_bug_report():
-    """Handle bug report submission."""
-    ui.notify("Bug report submitted!", type='positive')
-
-
-def handle_chat_resume():
-    """Handle chat resume action."""
-    ui.notify("Returning to chat...", type='info')
-
-
-def handle_new_chat():
-    """Handle new chat action."""
-    ui.notify("Starting new chat...", type='info')
-
-
-def handle_open_settings():
-    """Handle settings action."""
-    ui.notify("Opening settings...", type='info')
-
-
-def handle_search_conversations(query):
-    """Handle conversation search."""
-    ui.notify(f"Searching for: {query}", type='info')
-
-
-def handle_send_message(message):
-    """Handle sending a message."""
-    ui.notify(f"Sending: {message}", type='positive')
-
-
-# Register action handlers
-register_action_handler("bug.report", handle_bug_report)
-register_action_handler("chat.resume", handle_chat_resume)
-register_action_handler("startNewChat", handle_new_chat)
-register_action_handler("openSettings", handle_open_settings)
-register_action_handler("searchConversations", handle_search_conversations)
-register_action_handler("sendMessage", handle_send_message)
-
-
-@ui.page('/')
-def main():
-    """Main page demonstrating MondrUI rendering."""
+def setup_bug_report_demo():
+    """Set up the bug report form demo."""
     
-    ui.label('MondrUI Rendering Demo').classes('text-2xl font-bold mb-6')
-    
-    # Bug Report Form Demo
-    ui.label('Bug Report Form Demo').classes('text-xl font-semibold mb-4')
-    
+    # Bug report form specification
     bug_report_spec = {
         "type": "ui.render",
         "component": "bugReportForm",
@@ -72,206 +25,195 @@ def main():
                 {"id": "severity", "label": "Severity", "type": "select", "options": ["Low", "Medium", "High", "Critical"], "required": True}
             ],
             "actions": [
-                {"id": "submit", "label": "Submit", "type": "submit", "target": "bug.report"},
-                {"id": "cancel", "label": "Cancel", "type": "cancel", "target": "chat.resume"}
+                {"id": "submit", "label": "Submit Bug Report", "action": "submit_bug"},
+                {"id": "cancel", "label": "Cancel", "action": "cancel_bug"}
             ]
         }
     }
     
-    # Render the bug report form
-    try:
-        render_ui(bug_report_spec)
-    except Exception as e:
-        ui.label(f"Error rendering bug report form: {e}").classes('text-red-500')
-    
-    ui.separator().classes('my-8')
-    
-    # Container Demo
-    ui.label('Container with Buttons Demo').classes('text-xl font-semibold mb-4')
-    
-    container_spec = {
-        "type": "ui.render",
-        "component": "Container",
-        "props": {
-            "direction": "horizontal",
-            "children": [
-                {
-                    "component": "Button",
-                    "props": {
-                        "label": "New Chat",
-                        "icon": "add",
-                        "onClick": "startNewChat"
-                    }
-                },
-                {
-                    "component": "Button",
-                    "props": {
-                        "label": "Settings",
-                        "icon": "settings",
-                        "onClick": "openSettings"
-                    }
-                }
-            ]
-        }
-    }
-    
-    try:
-        render_ui(container_spec)
-    except Exception as e:
-        ui.label(f"Error rendering container: {e}").classes('text-red-500')
-    
-    ui.separator().classes('my-8')
-    
-    # Header Demo
-    ui.label('Header Demo').classes('text-xl font-semibold mb-4')
-    
-    header_spec = {
-        "type": "ui.render",
-        "component": "Header",
-        "props": {
-            "title": "MondrUI Chat",
-            "actions": [
-                {"icon": "settings", "action": "openSettings"}
-            ]
-        }
-    }
-    
-    try:
-        render_ui(header_spec)
-    except Exception as e:
-        ui.label(f"Error rendering header: {e}").classes('text-red-500')
-    
-    ui.separator().classes('my-8')
-    
-    # Chat Input Demo
-    ui.label('Chat Input Demo').classes('text-xl font-semibold mb-4')
-    
-    chat_input_spec = {
-        "type": "ui.render",
-        "component": "ChatInput",
-        "props": {
-            "onSend": "sendMessage",
-            "placeholder": "Type your message..."
-        }
-    }
-    
-    try:
-        render_ui(chat_input_spec)
-    except Exception as e:
-        ui.label(f"Error rendering chat input: {e}").classes('text-red-500')
-    
-    ui.separator().classes('my-8')
-    
-    # JSON Display
-    ui.label('JSON Specifications Used').classes('text-xl font-semibold mb-4')
-    
-    with ui.expansion('Bug Report Form JSON', icon='code'):
-        ui.code(json.dumps(bug_report_spec, indent=2)).classes('text-xs')
-    
-    with ui.expansion('Container JSON', icon='code'):
-        ui.code(json.dumps(container_spec, indent=2)).classes('text-xs')
-    
-    with ui.expansion('Header JSON', icon='code'):
-        ui.code(json.dumps(header_spec, indent=2)).classes('text-xs')
-    
-    with ui.expansion('Chat Input JSON', icon='code'):
-        ui.code(json.dumps(chat_input_spec, indent=2)).classes('text-xs')
+    with ui.card().classes('w-full max-w-4xl mx-auto'):
+        ui.label('MondrUI Demo: Bug Report Form').classes('text-2xl font-bold mb-4')
+        
+        # Render the bug report form using MondrUI
+        try:
+            rendered_form = render_ui(bug_report_spec)
+            ui.label('✅ Bug report form rendered successfully!').classes('text-green-600 mb-4')
+        except Exception as e:
+            ui.label(f'❌ Error rendering form: {str(e)}').classes('text-red-600')
 
 
-@ui.page('/chatgpt-demo')
-def chatgpt_demo():
-    """Demo page showing a ChatGPT-like interface using MondrUI."""
+def setup_component_showcase():
+    """Set up the component showcase demo."""
     
-    chatgpt_spec = {
-        "type": "ui.render",
-        "component": "Container",
-        "props": {
-            "direction": "vertical",
-            "children": [
-                {
-                    "component": "Header",
-                    "props": {
-                        "title": "MondrUI Chat",
-                        "actions": [
-                            {"icon": "settings", "action": "openSettings"}
-                        ]
+    with ui.card().classes('w-full max-w-4xl mx-auto mt-8'):
+        ui.label('MondrUI Component Showcase').classes('text-2xl font-bold mb-4')
+        
+        # Text component demo
+        text_spec = {
+            "type": "ui.render",
+            "component": "Text",
+            "props": {
+                "text": "Welcome to MondrUI!",
+                "variant": "h2",
+                "style": {"classes": ["text-blue-600", "mb-4"]}
+            }
+        }
+        
+        try:
+            render_ui(text_spec)
+            ui.label('✅ Text component rendered').classes('text-green-600 text-sm')
+        except Exception as e:
+            ui.label(f'❌ Text component error: {str(e)}').classes('text-red-600 text-sm')
+        
+        ui.separator()
+        
+        # Container with multiple children
+        container_spec = {
+            "type": "ui.render",
+            "component": "Container",
+            "props": {
+                "layout": "horizontal",
+                "style": {"classes": ["gap-4", "mt-4"]},
+                "children": [
+                    {
+                        "component": "Button",
+                        "props": {
+                            "label": "Primary Action",
+                            "variant": "primary",
+                            "icon": "star"
+                        }
+                    },
+                    {
+                        "component": "Button",
+                        "props": {
+                            "label": "Secondary Action",
+                            "variant": "secondary",
+                            "icon": "settings"
+                        }
                     }
-                },
-                {
-                    "component": "Container",
-                    "props": {
-                        "direction": "horizontal",
-                        "children": [
-                            {
-                                "component": "Sidebar",
-                                "props": {
-                                    "direction": "vertical",
-                                    "width": "240px",
-                                    "children": [
-                                        {
-                                            "component": "Button",
-                                            "props": {
-                                                "label": "New Chat",
-                                                "icon": "add",
-                                                "onClick": "startNewChat"
-                                            }
-                                        },
-                                        {
-                                            "component": "Input",
-                                            "props": {
-                                                "placeholder": "Search chat...",
-                                                "onChange": "searchConversations"
-                                            }
-                                        }
-                                    ]
+                ]
+            }
+        }
+        
+        try:
+            render_ui(container_spec)
+            ui.label('✅ Container with buttons rendered').classes('text-green-600 text-sm')
+        except Exception as e:
+            ui.label(f'❌ Container error: {str(e)}').classes('text-red-600 text-sm')
+
+
+def setup_chat_interface_demo():
+    """Set up a chat interface demo using MondrUI."""
+    
+    with ui.card().classes('w-full max-w-4xl mx-auto mt-8'):
+        ui.label('MondrUI Chat Interface Demo').classes('text-2xl font-bold mb-4')
+        
+        # Chat container spec
+        chat_spec = {
+            "type": "ui.render",
+            "component": "Container",
+            "props": {
+                "layout": "vertical",
+                "style": {"classes": ["h-96", "border", "rounded-lg", "p-4"]},
+                "children": [
+                    {
+                        "component": "Container",
+                        "props": {
+                            "layout": "vertical",
+                            "style": {"classes": ["flex-1", "overflow-auto", "mb-4"]},
+                            "children": [
+                                {
+                                    "component": "Text",
+                                    "props": {
+                                        "text": "User: Hello, how can I report a bug?",
+                                        "style": {"classes": ["mb-2", "p-2", "bg-blue-100", "rounded"]}
+                                    }
+                                },
+                                {
+                                    "component": "Text",
+                                    "props": {
+                                        "text": "Assistant: I can help you create a bug report form. Let me render one for you using MondrUI!",
+                                        "style": {"classes": ["mb-2", "p-2", "bg-gray-100", "rounded"]}
+                                    }
                                 }
-                            },
-                            {
-                                "component": "Container",
-                                "props": {
-                                    "direction": "vertical",
-                                    "grow": True,
-                                    "children": [
-                                        {
-                                            "component": "Divider",
-                                            "props": {"margin": "md"}
-                                        },
-                                        {
-                                            "component": "ChatInput",
-                                            "props": {
-                                                "onSend": "sendMessage",
-                                                "placeholder": "Type your message..."
-                                            }
-                                        }
-                                    ]
+                            ]
+                        }
+                    },
+                    {
+                        "component": "Container",
+                        "props": {
+                            "layout": "horizontal",
+                            "style": {"classes": ["gap-2"]},
+                            "children": [
+                                {
+                                    "component": "Input",
+                                    "props": {
+                                        "inputType": "text",
+                                        "placeholder": "Type your message...",
+                                        "style": {"classes": ["flex-1"]}
+                                    }
+                                },
+                                {
+                                    "component": "Button",
+                                    "props": {
+                                        "label": "Send",
+                                        "variant": "primary",
+                                        "icon": "send"
+                                    }
                                 }
-                            }
-                        ]
+                            ]
+                        }
                     }
-                }
-            ]
+                ]
+            }
         }
-    }
-    
-    ui.label('ChatGPT-style Interface Demo').classes('text-2xl font-bold mb-6')
-    
-    try:
-        render_ui(chatgpt_spec)
-    except Exception as e:
-        ui.label(f"Error rendering ChatGPT interface: {e}").classes('text-red-500')
-    
-    ui.separator().classes('my-8')
-    
-    with ui.expansion('Full ChatGPT Interface JSON', icon='code'):
-        ui.code(json.dumps(chatgpt_spec, indent=2)).classes('text-xs')
+        
+        try:
+            render_ui(chat_spec)
+            ui.label('✅ Chat interface rendered').classes('text-green-600 text-sm')
+        except Exception as e:
+            ui.label(f'❌ Chat interface error: {str(e)}').classes('text-red-600 text-sm')
 
 
-if __name__ in {"__main__", "__mp_main__"}:
-    # Add some custom CSS for better styling
-    ui.add_css('''
-        .nicegui-content {
-            padding: 2rem;
-        }
-    ''')
+async def main():
+    """Main function to set up all demos."""
     
-    ui.run(title='MondrUI Rendering Demo', port=8081)
+    # Set up the page
+    ui.query('.nicegui-content').classes('p-8')
+    
+    with ui.column().classes('w-full max-w-6xl mx-auto'):
+        ui.label('MondrUI Generic Rendering System').classes('text-4xl font-bold text-center mb-8')
+        ui.label('Demonstrating dynamic UI generation from JSON specifications').classes('text-xl text-center text-gray-600 mb-8')
+        
+        # Set up all demo sections
+        setup_bug_report_demo()
+        setup_component_showcase()
+        setup_chat_interface_demo()
+        
+        # Add some documentation
+        with ui.card().classes('w-full max-w-4xl mx-auto mt-8'):
+            ui.label('About MondrUI').classes('text-2xl font-bold mb-4')
+            ui.markdown("""
+MondrUI is a generic UI rendering system that allows you to create dynamic user interfaces 
+from JSON specifications. Key features:
+
+- **Generic Component System**: Extensible architecture with abstract base components
+- **Template System**: Reusable UI templates with variable substitution
+- **Plugin Architecture**: Easy registration of custom components and templates
+- **Event Handling**: Unified event system with action handlers
+- **Style Management**: Flexible styling with CSS classes and inline styles
+- **NiceGUI Integration**: Seamless integration with NiceGUI for web UIs
+
+The system supports various component types including containers, forms, buttons, 
+inputs, text elements, and custom components that you can define and register.
+            """)
+
+
+if __name__ == '__main__':
+    ui.run(
+        title='MondrUI Demo',
+        favicon='🎨',
+        show=True,
+        reload=False,
+        port=8080
+    )

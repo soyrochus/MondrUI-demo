@@ -1,131 +1,312 @@
 #!/usr/bin/env python3
 """
-Integration test showing how MondrUI can be used with the AI agent.
+Integration demo showing MondrUI with AI chat functionality.
+This demonstrates the complete integration of AI chat with dynamic UI generation.
 """
 
+import asyncio
+from nicegui import ui, app
 from ai import AIAgent
-from mondrui import render_ui, register_action_handler
-from nicegui import ui
-import json
+from mondrui import render_ui, register_component, create_component, BaseComponent
 
 
-# Example of how the AI could generate MondrUI specifications
-def ai_generate_bug_form():
-    """Simulate AI generating a bug report form specification."""
-    return {
-        "type": "ui.render",
-        "component": "bugReportForm",
-        "props": {
-            "title": "AI-Generated Bug Report",
-            "fields": [
-                {"id": "summary", "label": "Bug Summary", "type": "text", "required": True},
-                {"id": "description", "label": "Description", "type": "textarea", "required": True},
-                {"id": "severity", "label": "Severity", "type": "select", "options": ["Low", "Medium", "High", "Critical"], "required": True}
-            ],
-            "actions": [
-                {"id": "submit", "label": "Submit Bug", "type": "submit", "target": "bug.submit"},
-                {"id": "cancel", "label": "Cancel", "type": "cancel", "target": "chat.resume"}
-            ]
-        }
-    }
-
-
-@ui.page('/')
-def integration_demo():
-    """Demo showing AI + MondrUI integration."""
+class IntegratedChatApp:
+    """Integrated chat application with AI and MondrUI."""
     
-    ui.label('MondrUI + AI Integration Demo').classes('text-2xl font-bold mb-6')
+    def __init__(self):
+        self.ai_agent = AIAgent()
+        self.setup_custom_components()
+        self.setup_ui()
     
-    # Create AI agent
-    ai_agent = AIAgent()
-    
-    # Action handlers
-    def handle_bug_submit():
-        ui.notify("Bug submitted via AI-generated form!", type='positive')
-    
-    def handle_chat_resume():
-        ui.notify("Returning to AI chat...", type='info')
-    
-    register_action_handler("bug.submit", handle_bug_submit)
-    register_action_handler("chat.resume", handle_chat_resume)
-    
-    # Demo buttons
-    with ui.row().classes('mb-6 gap-4'):
-        ui.button('Generate Bug Form (AI)', 
-                 on_click=lambda: generate_and_render_form()).classes('bg-blue-500')
-        ui.button('Show JSON Spec', 
-                 on_click=lambda: show_json_spec()).classes('bg-green-500')
-        ui.button('Clear Forms', 
-                 on_click=lambda: clear_forms()).classes('bg-red-500')
-    
-    # Container for dynamically generated forms
-    global form_container
-    form_container = ui.column().classes('w-full')
-    
-    # Container for JSON display
-    global json_container
-    json_container = ui.column().classes('w-full')
-    
-    def generate_and_render_form():
-        """Generate and render a form using AI logic."""
-        form_container.clear()
-        json_container.clear()
+    def setup_custom_components(self):
+        """Set up custom components for the integrated demo."""
         
-        with form_container:
-            ui.label('AI-Generated Form:').classes('text-lg font-semibold mb-4')
+        def memory_stats_render(props, renderer):
+            """Render memory statistics component."""
+            stats = props.get('stats', {})
             
-            # Simulate AI generating the form specification
-            form_spec = ai_generate_bug_form()
+            with ui.card().classes('p-4 bg-blue-50'):
+                ui.label('Memory Statistics').classes('font-bold text-lg mb-2')
+                with ui.column().classes('gap-2'):
+                    ui.label(f"Total Messages: {stats.get('total_messages', 0)}")
+                    ui.label(f"Memory Size: {stats.get('memory_size', 0)} characters")
+                    ui.label(f"Last Update: {stats.get('last_update', 'Never')}")
+        
+        def chat_message_render(props, renderer):
+            """Render a chat message component."""
+            role = props.get('role', 'user')
+            content = props.get('content', '')
+            timestamp = props.get('timestamp', '')
+            
+            bg_class = 'bg-blue-100' if role == 'user' else 'bg-gray-100'
+            
+            with ui.card().classes(f'p-3 mb-2 {bg_class}'):
+                with ui.row().classes('w-full justify-between items-start'):
+                    with ui.column().classes('flex-1'):
+                        ui.label(f"{role.title()}:").classes('font-bold text-sm')
+                        ui.label(content).classes('text-sm')
+                    if timestamp:
+                        ui.label(timestamp).classes('text-xs text-gray-500')
+        
+        # Register custom components
+        MemoryStatsComponent = create_component(memory_stats_render)
+        ChatMessageComponent = create_component(chat_message_render)
+        
+        register_component('MemoryStats', MemoryStatsComponent)
+        register_component('ChatMessage', ChatMessageComponent)
+    
+    def setup_ui(self):
+        """Set up the main UI."""
+        ui.query('.nicegui-content').classes('p-0')
+        
+        with ui.column().classes('h-screen w-full'):
+            # Header
+            self.render_header()
+            
+            # Main content area
+            with ui.row().classes('flex-1 w-full'):
+                # Sidebar with memory stats
+                self.render_sidebar()
+                
+                # Chat area
+                self.render_chat_area()
+    
+    def render_header(self):
+        """Render the application header using MondrUI."""
+        header_spec = {
+            "type": "ui.render",
+            "component": "Container",
+            "props": {
+                "layout": "horizontal",
+                "style": {"classes": ["w-full", "p-4", "bg-blue-600", "text-white"]},
+                "children": [
+                    {
+                        "component": "Text",
+                        "props": {
+                            "text": "MondrUI + AI Integration Demo",
+                            "variant": "h1",
+                            "style": {"classes": ["text-white", "flex-1"]}
+                        }
+                    },
+                    {
+                        "component": "Button",
+                        "props": {
+                            "label": "Clear Chat",
+                            "variant": "secondary",
+                            "action": "clear_chat"
+                        }
+                    }
+                ]
+            }
+        }
+        
+        try:
+            render_ui(header_spec)
+        except Exception as e:
+            ui.label(f"Header render error: {e}").classes('text-red-500')
+    
+    def render_sidebar(self):
+        """Render the sidebar with memory statistics."""
+        with ui.column().classes('w-80 bg-gray-50 p-4 h-full'):
+            ui.label('AI Memory Status').classes('text-lg font-bold mb-4')
+            
+            # Memory stats using custom component
+            stats = self.ai_agent.get_memory_stats()
+            memory_stats_spec = {
+                "type": "ui.render",
+                "component": "MemoryStats",
+                "props": {
+                    "stats": stats
+                }
+            }
             
             try:
-                # Render the form using MondrUI
-                render_ui(form_spec)
-                ui.notify("Form generated successfully!", type='positive')
+                render_ui(memory_stats_spec)
             except Exception as e:
-                ui.label(f"Error rendering form: {e}").classes('text-red-500')
+                ui.label(f"Memory stats error: {e}").classes('text-red-500')
+            
+            ui.separator().classes('my-4')
+            
+            # Action buttons
+            with ui.column().classes('gap-2'):
+                ui.button('Export Memory', on_click=self.export_memory).classes('w-full')
+                ui.button('Import Memory', on_click=self.import_memory).classes('w-full')
+                ui.button('Reset Memory', on_click=self.reset_memory).classes('w-full')
     
-    def show_json_spec():
-        """Show the JSON specification."""
-        json_container.clear()
+    def render_chat_area(self):
+        """Render the main chat area."""
+        with ui.column().classes('flex-1 h-full p-4'):
+            # Chat history container
+            self.chat_container = ui.column().classes('flex-1 overflow-auto border rounded p-4 mb-4')
+            
+            # Load existing messages
+            self.refresh_chat_history()
+            
+            # Input area
+            with ui.row().classes('w-full gap-2'):
+                self.message_input = ui.input(
+                    placeholder='Type your message here...',
+                    on_change=self.on_input_change
+                ).classes('flex-1')
+                
+                ui.button('Send', on_click=self.send_message).classes('px-6')
+                
+                # Quick actions using MondrUI
+                quick_actions_spec = {
+                    "type": "ui.render",
+                    "component": "Container",
+                    "props": {
+                        "layout": "horizontal",
+                        "style": {"classes": ["gap-2"]},
+                        "children": [
+                            {
+                                "component": "Button",
+                                "props": {
+                                    "label": "Bug Report",
+                                    "variant": "secondary",
+                                    "action": "show_bug_form"
+                                }
+                            },
+                            {
+                                "component": "Button",
+                                "props": {
+                                    "label": "Help",
+                                    "variant": "secondary", 
+                                    "action": "show_help"
+                                }
+                            }
+                        ]
+                    }
+                }
+                
+                try:
+                    render_ui(quick_actions_spec)
+                except Exception as e:
+                    ui.label(f"Quick actions error: {e}").classes('text-red-500 text-xs')
+    
+    def refresh_chat_history(self):
+        """Refresh the chat history display."""
+        self.chat_container.clear()
         
-        with json_container:
-            ui.label('Generated JSON Specification:').classes('text-lg font-semibold mb-4')
-            form_spec = ai_generate_bug_form()
-            ui.code(json.dumps(form_spec, indent=2)).classes('text-xs bg-gray-100 p-4 rounded')
+        messages = self.ai_agent.get_conversation_history()
+        for msg in messages:
+            role = 'user' if isinstance(msg, type(msg)) and hasattr(msg, 'content') else 'assistant'
+            # Simple role detection - in a real app you'd import the message types
+            if 'Human' in str(type(msg)):
+                role = 'user'
+            elif 'AI' in str(type(msg)):
+                role = 'assistant'
+                
+            message_spec = {
+                "type": "ui.render",
+                "component": "ChatMessage",
+                "props": {
+                    "role": role,
+                    "content": str(msg.content),
+                    "timestamp": ""
+                }
+            }
+            
+            try:
+                with self.chat_container:
+                    render_ui(message_spec)
+            except Exception as e:
+                with self.chat_container:
+                    ui.label(f"Message render error: {e}").classes('text-red-500 text-xs')
     
-    def clear_forms():
-        """Clear all generated content."""
-        form_container.clear()
-        json_container.clear()
-        ui.notify("Content cleared", type='info')
+    def on_input_change(self, e):
+        """Handle input changes for real-time features."""
+        # Could add typing indicators or other real-time features here
+        pass
     
-    # Add information about the integration
-    ui.separator().classes('my-8')
-    
-    with ui.card().classes('p-6 bg-blue-50'):
-        ui.label('How MondrUI + AI Integration Works:').classes('text-lg font-bold mb-4')
+    async def send_message(self):
+        """Send a message and get AI response."""
+        if not self.message_input.value.strip():
+            return
         
-        with ui.column().classes('gap-2'):
-            ui.label('1. User sends a message like "I want to report a bug"')
-            ui.label('2. AI Agent analyzes the intent and decides to show a form')
-            ui.label('3. AI generates a MondrUI JSON specification for a bug report form')
-            ui.label('4. MondrUI renderer creates the actual UI components')
-            ui.label('5. User interacts with the form, data is processed')
-            ui.label('6. Conversation continues seamlessly')
+        user_message = self.message_input.value.strip()
+        self.message_input.value = ''
+        
+        # Add user message to chat
+        with self.chat_container:
+            user_spec = {
+                "type": "ui.render",
+                "component": "ChatMessage",
+                "props": {
+                    "role": "user",
+                    "content": user_message
+                }
+            }
+            render_ui(user_spec)
+        
+        # Show typing indicator
+        with self.chat_container:
+            typing_indicator = ui.label("AI is typing...").classes('text-gray-500 italic')
+        
+        try:
+            # Get AI response using the streaming method
+            response_content = ""
+            async for chunk in self.ai_agent.send_message(user_message):
+                response_content += chunk
+            
+            # Remove typing indicator
+            typing_indicator.delete()
+            
+            # Add AI response to chat
+            with self.chat_container:
+                ai_spec = {
+                    "type": "ui.render",
+                    "component": "ChatMessage", 
+                    "props": {
+                        "role": "assistant",
+                        "content": response_content
+                    }
+                }
+                render_ui(ai_spec)
+            
+            # Scroll to bottom
+            ui.run_javascript('document.querySelector(".chat-container").scrollTop = document.querySelector(".chat-container").scrollHeight')
+            
+        except Exception as e:
+            typing_indicator.delete()
+            with self.chat_container:
+                ui.label(f"Error getting AI response: {e}").classes('text-red-500')
     
-    # Show example AI conversation flow
-    ui.separator().classes('my-8')
+    def export_memory(self):
+        """Export chat memory."""
+        try:
+            memory_data = self.ai_agent.get_conversation_history()
+            ui.notify(f"Memory exported: {len(memory_data)} messages", type='positive')
+        except Exception as e:
+            ui.notify(f"Export failed: {e}", type='negative')
     
-    ui.label('Example AI Conversation Flow:').classes('text-lg font-semibold mb-4')
+    def import_memory(self):
+        """Import chat memory."""
+        # In a real app, this would open a file dialog
+        ui.notify("Import functionality would open file dialog", type='info')
     
-    with ui.column().classes('gap-2 bg-gray-50 p-4 rounded'):
-        ui.markdown('**User:** "I found a bug in the application"')
-        ui.markdown('**AI:** "I\'ll help you report that bug. Let me create a form for you."')
-        ui.markdown('**AI:** *[Generates MondrUI specification and renders bug form]*')
-        ui.markdown('**AI:** "Please fill out the form above and I\'ll submit the bug report."')
-        ui.markdown('**User:** *[Fills form and submits]*')
-        ui.markdown('**AI:** "Bug report submitted successfully! Is there anything else I can help with?"')
+    def reset_memory(self):
+        """Reset chat memory."""
+        try:
+            self.ai_agent.clear_memory()
+            self.chat_container.clear()
+            ui.notify("Memory reset successfully", type='positive')
+        except Exception as e:
+            ui.notify(f"Reset failed: {e}", type='negative')
 
 
-if __name__ in {"__main__", "__mp_main__"}:
-    ui.run(title='MondrUI + AI Integration Demo', port=8082)
+def main():
+    """Main function to run the integrated demo."""
+    app_instance = IntegratedChatApp()
+    
+    ui.run(
+        title='MondrUI + AI Integration Demo',
+        favicon='🤖',
+        show=True,
+        reload=False,
+        port=8081
+    )
+
+
+if __name__ == '__main__':
+    main()
