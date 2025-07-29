@@ -30,6 +30,7 @@ class EventType(Enum):
     KEYDOWN = "keydown"
     FOCUS = "focus"
     BLUR = "blur"
+    SLIDE = "slide"  # For slider components
 
 
 @dataclass
@@ -135,6 +136,8 @@ class BaseComponent(ABC):
                     element.on('change', lambda h=handler, p=event.params: h(element.value, **p))
                 elif event.event == EventType.SUBMIT:
                     element.on('submit', lambda h=handler, p=event.params: h(**p))
+                elif event.event == EventType.SLIDE:
+                    element.on('update:model-value', lambda h=handler, p=event.params: h(element.value, **p))
                 # Add more event types as needed
 
 
@@ -229,6 +232,104 @@ class ButtonComponent(BaseComponent):
         return element
 
 
+class RadioComponent(BaseComponent):
+    """Radio button group for exclusive selection."""
+    
+    def render(self, renderer: 'MondrUIRenderer') -> Any:
+        options = self.props.get('options', {})  # {'value': 'label'} format
+        value = self.props.get('value')
+        field_id = self.props.get('id', '')
+        inline = self.props.get('inline', False)
+        
+        element = ui.radio(options, value=value)
+        
+        if inline:
+            element.props('inline')
+        
+        self.apply_styling_and_events(element, renderer)
+        return element
+
+
+class CheckboxGroupComponent(BaseComponent):
+    """Checkbox group for multiple selections."""
+    
+    def render(self, renderer: 'MondrUIRenderer') -> Any:
+        options = self.props.get('options', {})  # {'value': 'label'} format
+        selected_values = self.props.get('value', [])  # List of selected values
+        field_id = self.props.get('id', '')
+        layout = self.props.get('layout', 'vertical')  # vertical or horizontal
+        
+        if layout == 'horizontal':
+            container = ui.row()
+        else:
+            container = ui.column()
+            
+        current_selections = set(selected_values) if selected_values else set()
+        
+        with container:
+            for option_value, option_label in options.items():
+                checkbox = ui.checkbox(
+                    text=option_label, 
+                    value=option_value in current_selections
+                )
+                
+                # Store reference to update selections
+                def create_checkbox_handler(val):
+                    def on_checkbox_change(e):
+                        if e.value:
+                            current_selections.add(val)
+                        else:
+                            current_selections.discard(val)
+                    return on_checkbox_change
+                
+                checkbox.on('change', create_checkbox_handler(option_value))
+        
+        self.apply_styling_and_events(container, renderer)
+        return container
+
+
+class SliderComponent(BaseComponent):
+    """Slider for range value selection."""
+    
+    def render(self, renderer: 'MondrUIRenderer') -> Any:
+        min_val = self.props.get('min', 0)
+        max_val = self.props.get('max', 100)
+        step = self.props.get('step', 1)
+        value = self.props.get('value', min_val)
+        field_id = self.props.get('id', '')
+        
+        # Optional labels for semantic scales
+        min_label = self.props.get('minLabel')  # e.g., "Unhappy"
+        max_label = self.props.get('maxLabel')  # e.g., "Happy"
+        show_value = self.props.get('showValue', True)
+        label_always = self.props.get('labelAlways', False)
+        
+        with ui.column() as container:
+            # Scale labels if provided
+            if min_label and max_label:
+                with ui.row().classes('w-full justify-between text-sm text-gray-600'):
+                    ui.label(min_label)
+                    ui.label(max_label)
+            
+            # The slider itself
+            slider = ui.slider(min=min_val, max=max_val, step=step, value=value)
+            
+            if label_always:
+                slider.props('label-always')
+            
+            # Value display
+            if show_value:
+                value_label = ui.label(f'Value: {value}').classes('text-center text-sm')
+                
+                def update_value_display(e):
+                    value_label.text = f'Value: {e.value}'
+                
+                slider.on('update:model-value', update_value_display)
+        
+        self.apply_styling_and_events(container, renderer)
+        return container
+
+
 class FormComponent(BaseComponent):
     """Generic form component that can render any form structure."""
     
@@ -277,22 +378,60 @@ class FormComponent(BaseComponent):
         label = field.get('label', '')
         required = field.get('required', False)
         field_id = field.get('id', '')
+        field_type = field.get('type', 'text')
         
         # Render label
         label_text = f"{label}{'*' if required else ''}"
         ui.label(label_text).classes('text-sm font-medium mb-1')
         
-        # Render input field
-        input_spec = {
-            'component': 'Input',
-            'props': {
-                'inputType': field.get('type', 'text'),
-                'placeholder': field.get('placeholder', ''),
-                'required': required,
-                'options': field.get('options', []),
-                'style': {'classes': ['w-full', 'mb-3']}
+        # Render field based on type
+        if field_type == 'radio':
+            input_spec = {
+                'component': 'Radio',
+                'props': {
+                    'options': field.get('options', {}),
+                    'value': field.get('value'),
+                    'inline': field.get('inline', False),
+                    'style': {'classes': ['w-full', 'mb-3']}
+                }
             }
-        }
+        elif field_type == 'checkboxGroup':
+            input_spec = {
+                'component': 'CheckboxGroup',
+                'props': {
+                    'options': field.get('options', {}),
+                    'value': field.get('value', []),
+                    'layout': field.get('layout', 'vertical'),
+                    'style': {'classes': ['w-full', 'mb-3']}
+                }
+            }
+        elif field_type == 'slider':
+            input_spec = {
+                'component': 'Slider',
+                'props': {
+                    'min': field.get('min', 0),
+                    'max': field.get('max', 100),
+                    'step': field.get('step', 1),
+                    'value': field.get('value', field.get('min', 0)),
+                    'minLabel': field.get('minLabel'),
+                    'maxLabel': field.get('maxLabel'),
+                    'showValue': field.get('showValue', True),
+                    'labelAlways': field.get('labelAlways', False),
+                    'style': {'classes': ['w-full', 'mb-3']}
+                }
+            }
+        else:
+            # Default to Input component for standard input types
+            input_spec = {
+                'component': 'Input',
+                'props': {
+                    'inputType': field_type,
+                    'placeholder': field.get('placeholder', ''),
+                    'required': required,
+                    'options': field.get('options', []),
+                    'style': {'classes': ['w-full', 'mb-3']}
+                }
+            }
         
         if field_id:
             input_spec['props']['id'] = field_id
@@ -376,6 +515,9 @@ class MondrUIRenderer:
             'Text': TextComponent,
             'Input': InputComponent,
             'Button': ButtonComponent,
+            'Radio': RadioComponent,
+            'CheckboxGroup': CheckboxGroupComponent,
+            'Slider': SliderComponent,
             'Form': FormComponent,
             'Card': CardComponent,
             'List': ListComponent,

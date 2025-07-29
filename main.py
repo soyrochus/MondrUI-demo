@@ -85,14 +85,15 @@ def setup_form_handlers(ai_agent: AIAgent, message_container, log_element):
             await handle_form_submission(action_name, form_title)
         return handler
     
-    def create_data_collector(field_id: str):
-        """Create a data collector function for a specific field."""
-        def collect_data(value):
+    def create_data_collector(field_id):
+        """Create a data collector function for a specific field"""
+        def collector(value):
+            print(f"Data collector called: field_id={field_id}, value={value}")
             if 'current_form' not in form_data_store:
                 form_data_store['current_form'] = {}
             form_data_store['current_form'][field_id] = value
-            log_element.push(f"Form data collected - {field_id}: {value}")
-        return collect_data
+            print(f"Form data store updated: {form_data_store['current_form']}")
+        return collector
     
     # Register common form actions
     register_action_handler("submit_bug", create_form_handler("submit_bug", "Bug Report"))
@@ -149,6 +150,96 @@ def main():
                         placeholder=f'Enter {field_label.lower()}...',
                         on_change=lambda e, collector=collector: collector(e.value)
                     ).classes('w-full').props('type=email')
+                elif field_type == 'radio':
+                    # Radio button group for exclusive selection
+                    options = field.get('options', {})
+                    value = field.get('value')
+                    inline = field.get('inline', False)
+                    
+                    radio = ui.radio(options, value=value)
+                    if inline:
+                        radio.props('inline')
+                    
+                    def create_radio_handler(collector):
+                        def on_radio_change():
+                            current_value = radio.value
+                            log.push(f"Radio changed: {current_value}")
+                            collector(current_value)
+                        return on_radio_change
+                    
+                    radio.on('update:model-value', create_radio_handler(collector))
+                    
+                elif field_type == 'checkboxGroup':
+                    # Checkbox group for multiple selections
+                    options = field.get('options', {})
+                    selected_values = field.get('value', [])
+                    layout = field.get('layout', 'vertical')
+                    
+                    if layout == 'horizontal':
+                        container = ui.row()
+                    else:
+                        container = ui.column()
+                    
+                    current_selections = set(selected_values) if selected_values else set()
+                    
+                    with container:
+                        for option_value, option_label in options.items():
+                            checkbox = ui.checkbox(
+                                text=option_label,
+                                value=option_value in current_selections
+                            )
+                            
+                            def create_checkbox_handler(val, collector):
+                                def on_checkbox_change():
+                                    current_value = checkbox.value
+                                    if current_value:
+                                        current_selections.add(val)
+                                    else:
+                                        current_selections.discard(val)
+                                    log.push(f"Checkbox changed: {list(current_selections)}")
+                                    collector(list(current_selections))
+                                return on_checkbox_change
+                            
+                            checkbox.on('update:model-value', create_checkbox_handler(option_value, collector))
+                
+                elif field_type == 'slider':
+                    # Range slider for value selection
+                    min_val = field.get('min', 0)
+                    max_val = field.get('max', 100)
+                    step = field.get('step', 1)
+                    value = field.get('value', min_val)
+                    min_label = field.get('minLabel')
+                    max_label = field.get('maxLabel')
+                    show_value = field.get('showValue', True)
+                    label_always = field.get('labelAlways', False)
+                    
+                    with ui.column().classes('w-full'):
+                        # Scale labels if provided
+                        if min_label and max_label:
+                            with ui.row().classes('w-full justify-between text-sm text-gray-600'):
+                                ui.label(min_label)
+                                ui.label(max_label)
+                        
+                        # The slider itself
+                        slider = ui.slider(min=min_val, max=max_val, step=step, value=value)
+                        
+                        if label_always:
+                            slider.props('label-always')
+                        
+                        # Value display
+                        if show_value:
+                            value_label = ui.label(f'Value: {value}').classes('text-center text-sm')
+                        
+                        # Set up event handling using direct callback binding
+                        def handle_slider_change():
+                            current_value = slider.value
+                            log.push(f"Slider changed: {current_value}")
+                            collector(current_value)
+                            if show_value:
+                                value_label.text = f'Value: {current_value}'
+                        
+                        slider.on('update:model-value', handle_slider_change)
+                
                 else:  # text input (default)
                     ui.input(
                         placeholder=f'Enter {field_label.lower()}...',
