@@ -21,11 +21,11 @@ For detailed information about the MondrUI specification and concept, see: [Mond
 
 1. The chat resulting the form rendering and processing of result:
 
-![Chat](images/form.png)
+![Chat](images/mondrui-conversation.png)
 
 2. The rendered form
 
-![Chat](images/formshown.png)
+![Chat](images/mondrui-form.png)
 
 ## Installation
 
@@ -231,7 +231,7 @@ Special thanks to:
 - **Open Source Contributors**: To everyone who contributes to making Python-based web development better.
 
 The beauty of MondrUI lies in its simplicity - just like NiceGUI itself. No webpack, no npm, no complex build processes - just Python code that creates beautiful, interactive web applications. This project demonstrates how powerful this approach can be when combined with modern AI capabilities.
-
+±
 ## Contributing
 
 Pull requests are welcome. For major changes, please open an issue first

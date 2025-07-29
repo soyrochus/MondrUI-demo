@@ -39,7 +39,7 @@ def extract_mondrui_json(text: str) -> tuple[str, dict | None]:
     return text, None
 
 
-def setup_form_handlers(ai_agent: AIAgent, message_container):
+def setup_form_handlers(ai_agent: AIAgent, message_container, log_element):
     """Set up form action handlers for MondrUI forms."""
     
     # Store form data globally so handlers can access it
@@ -91,6 +91,7 @@ def setup_form_handlers(ai_agent: AIAgent, message_container):
             if 'current_form' not in form_data_store:
                 form_data_store['current_form'] = {}
             form_data_store['current_form'][field_id] = value
+            log_element.push(f"Form data collected - {field_id}: {value}")
         return collect_data
     
     # Register common form actions
@@ -99,19 +100,18 @@ def setup_form_handlers(ai_agent: AIAgent, message_container):
     register_action_handler("submit_feedback", create_form_handler("submit_feedback", "Feedback"))
     register_action_handler("submit_form", create_form_handler("submit_form", "Form"))
     
-    # Return the data collector factory for use in form rendering
-    return create_data_collector
+    # Return both the data collector factory and form data store for use in form rendering
+    return create_data_collector, form_data_store
 
 
 @ui.page('/')
 def main():
     ai_agent = AIAgent(model='gpt-4o-mini')
 
-    def render_custom_bug_form(props: dict, data_collector_factory):
-        """Render a custom bug report form with data collection."""
-        title = props.get('title', 'Bug Report')
+    def render_any_form_with_data_collection(props: dict, data_collector_factory):
+        """Render any form with data collection, works for all form types."""
+        title = props.get('title', 'Form')
         fields = props.get('fields', [])
-        actions = props.get('actions', [])
         
         ui.label(title).classes('text-lg font-bold mb-4')
         
@@ -139,31 +139,23 @@ def main():
                         options=options,
                         on_change=lambda e, collector=collector: collector(e.value)
                     ).classes('w-full')
-                else:  # text input
+                elif field_type == 'number':
+                    ui.number(
+                        placeholder=f'Enter {field_label.lower()}...',
+                        on_change=lambda e, collector=collector: collector(e.value)
+                    ).classes('w-full')
+                elif field_type == 'email':
+                    ui.input(
+                        placeholder=f'Enter {field_label.lower()}...',
+                        on_change=lambda e, collector=collector: collector(e.value)
+                    ).classes('w-full').props('type=email')
+                else:  # text input (default)
                     ui.input(
                         placeholder=f'Enter {field_label.lower()}...',
                         on_change=lambda e, collector=collector: collector(e.value)
                     ).classes('w-full')
-            
-            # Render action buttons
-            if actions:
-                with ui.row().classes('w-full justify-end mt-4 gap-2'):
-                    for action in actions:
-                        label = action.get('label', 'Submit')
-                        action_name = action.get('action', 'submit_form')
-                        
-                        async def handle_action(action_name=action_name):
-                            # Trigger the registered action handler
-                            try:
-                                from mondrui import MondrUIRenderer
-                                renderer = MondrUIRenderer()
-                                handler = renderer.action_handlers.get(action_name)
-                                if handler:
-                                    await handler()
-                            except Exception as e:
-                                ui.notify(f'Action error: {e}', type='negative')
-                        
-                        ui.button(label, on_click=handle_action).classes('bg-blue-500 text-white')
+
+    # Note: The render_custom_bug_form function has been replaced by render_any_form_with_data_collection
 
     async def send() -> None:
         question = text.value
@@ -187,6 +179,8 @@ def main():
         cleaned_response, mondrui_spec = extract_mondrui_json(response)
         
         if mondrui_spec:
+            log.push(f"MondrUI JSON detected: {mondrui_spec}")
+            
             # Update the response message with cleaned text
             response_message.clear()
             with response_message:
@@ -201,18 +195,83 @@ def main():
                     ui.label('📋 Interactive Form').classes('text-lg font-bold mb-4')
                     
                     try:
-                        # Create a custom form renderer with data collection
-                        if mondrui_spec.get('component') == 'bugReportForm':
-                            render_custom_bug_form(mondrui_spec.get('props', {}), data_collector_factory)
-                        else:
-                            # Fallback to standard MondrUI rendering
-                            render_ui(mondrui_spec)
+                        # Log form rendering attempt
+                        log.push(f"Attempting to render MondrUI form: {mondrui_spec}")
                         
-                        # Add close button
-                        ui.button('Close Form', on_click=form_dialog.close).classes('mt-4')
+                        # Use unified form renderer with data collection for ALL form types
+                        # This ensures consistent behavior and data collection
+                        form_props = mondrui_spec.get('props', {})
+                        render_any_form_with_data_collection(form_props, data_collector_factory)
+                        
+                        log.push("Form rendered successfully")
+                        
+                        # Unified submit & close button that sends all data to AI
+                        async def handle_submit_and_close():
+                            # Get collected form data
+                            collected_data = form_data_store.get('current_form', {})
+                            log.push(f"Form submission: collected_data = {collected_data}")
+                            
+                            # Only send data if there's actually some data collected
+                            if collected_data:
+                                # Determine form type from the MondrUI spec
+                                form_title = mondrui_spec.get('props', {}).get('title', 'Form')
+                                action_name = 'submit_form'  # Default action
+                                if mondrui_spec.get('component') == 'bugReportForm':
+                                    action_name = 'submit_bug'
+                                
+                                collected_data['action'] = action_name
+                                collected_data['timestamp'] = '2025-01-01T00:00:00Z'  # In real app, use datetime.now()
+                                
+                                # Close the dialog first
+                                form_dialog.close()
+                                
+                                # Add form submission message to chat
+                                with message_container:
+                                    ui.chat_message(
+                                        text=f"✅ {form_title} submitted with data: {json.dumps(collected_data, indent=2)}", 
+                                        name='System', 
+                                        sent=False
+                                    ).classes('bg-green-50')
+                                    
+                                    # Get AI response about the submitted data
+                                    response_message = ui.chat_message(name='Bot', sent=False)
+                                    spinner = ui.spinner(type='dots')
+
+                                # Send form data to AI for processing
+                                form_message = f"User submitted form data: {json.dumps(collected_data, indent=2)}. Please acknowledge receipt and process this information."
+                                
+                                response = ''
+                                async for chunk in ai_agent.send_message(form_message, NiceGuiLogElementCallbackHandler(log)):
+                                    response += chunk
+                                    response_message.clear()
+                                    with response_message:
+                                        ui.html(response)
+                                    ui.run_javascript('window.scrollTo(0, document.body.scrollHeight)')
+                                message_container.remove(spinner)
+                                
+                                # Clear form data after submission
+                                form_data_store['current_form'] = {}
+                            else:
+                                # No data collected, just close
+                                form_dialog.close()
+                                with message_container:
+                                    ui.chat_message(
+                                        text="Form was closed without submitting any data.", 
+                                        name='System', 
+                                        sent=False
+                                    ).classes('bg-gray-50')
+                        
+                        ui.button('Submit & Close', on_click=handle_submit_and_close).classes('mt-4 bg-blue-500 text-white')
                         
                     except Exception as e:
-                        ui.label(f'Error rendering form: {str(e)}').classes('text-red-500')
+                        error_msg = f'Error rendering form: {str(e)}'
+                        log.push(f"FORM RENDERING ERROR: {error_msg}")
+                        log.push(f"MondrUI spec: {mondrui_spec}")
+                        log.push(f"Exception type: {type(e).__name__}")
+                        import traceback
+                        log.push(f"Traceback: {traceback.format_exc()}")
+                        
+                        ui.label(error_msg).classes('text-red-500')
                         ui.button('Close', on_click=form_dialog.close)
             
             # Open the form dialog
@@ -273,8 +332,11 @@ def main():
             ui.button('Refresh Memory View', on_click=update_memory_display).classes('mb-4')
             ui.button('Clear Conversation', on_click=new_chat).classes('mb-4 bg-red-500')
 
-    # Set up form handlers for MondrUI forms
-    data_collector_factory = setup_form_handlers(ai_agent, message_container)
+    # Set up form handlers for MondrUI forms (after log element is created)
+    data_collector_factory, form_data_store = setup_form_handlers(ai_agent, message_container, log)
+    
+    # Add a startup log message to verify logging is working
+    log.push("MondrUI application started - logging is active")
 
     with ui.footer().classes('bg-white'), ui.column().classes('w-full max-w-3xl mx-auto my-6'):
         with ui.row().classes('w-full no-wrap items-center'):
