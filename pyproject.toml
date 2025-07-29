@@ -6,9 +6,17 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "langchain>=0.3.27",
+    "langchain-core>=0.3.27",
     "langchain-community>=0.3.27",
     "langchain-openai>=0.3.28",
     "nicegui>=2.21.1",
-    "pytest>=8.4.1",
     "python-dotenv>=1.1.1",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.17.0",
+    "pytest>=8.4.1",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.12.5",
 ]

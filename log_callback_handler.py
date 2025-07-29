@@ -1,7 +1,7 @@
 from typing import Any, Dict, Optional
 
-from langchain.callbacks.base import BaseCallbackHandler
-from langchain.schema import AgentAction, AgentFinish
+from langchain_core.callbacks.base import BaseCallbackHandler
+from langchain_core.agents import AgentAction, AgentFinish
 
 from nicegui import ui
 

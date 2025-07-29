@@ -77,7 +77,7 @@ def main():
                         for i, msg in enumerate(messages):
                             with ui.card().classes('mb-2 p-3'):
                                 # Check message type using isinstance
-                                from ai import HumanMessage
+                                from langchain_core.messages import HumanMessage
                                 msg_type = "Human" if isinstance(msg, HumanMessage) else "AI"
                                 timestamp = f"Message {i+1}"
                                 ui.label(f'{timestamp} - {msg_type}:').classes('font-bold text-sm text-blue-600')
