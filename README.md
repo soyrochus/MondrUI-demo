@@ -45,16 +45,16 @@ For example, the following json:
   "component": "bugReportForm",  
   "props": {  
     "title": "Report a Bug",  
-    "fields": \[  
+    "fields": [  
       { "id":"summary", "label":"Bug Summary", "type":"text", "required":true },  
       { "id":"description", "label":"Description", "type":"textarea", "required":true },  
       { "id":"steps", "label":"Steps to Reproduce", "type":"textarea", "required":false },  
-      { "id":"severity", "label":"Severity", "type":"select", "options":\["Low","Medium","High","Critical"\], "required":true }  
-    \],  
-    "actions": \[  
+      { "id":"severity", "label":"Severity", "type":"select", "options":["Low","Medium","High","Critical"], "required":true }  
+    ],  
+    "actions": [  
       { "id":"submit", "label":"Submit", "type":"submit", "target":"bug.report" },  
       { "id":"cancel", "label":"Cancel", "type":"cancel", "target":"chat.resume" }  
-    \]  
+    ]  
   }  
 }
 ```
@@ -62,7 +62,7 @@ For example, the following json:
 
 Would result in the display of this form: 
 
-![][image2]
+![MondrUI](images/SimpleForm.png)
 
 ### **Rules and Restrictions**
 
@@ -201,7 +201,7 @@ Below is a full **MondrUI DSL example** describing a ChatGPT-like conversational
 
 Would result in the display of this window:
 
-
+![MondrUI](images/chatgpt_mockup.png)
 
 ## Contributing
 
