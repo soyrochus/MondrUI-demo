@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
+from langchain_core.messages import HumanMessage, AIMessage, BaseMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from log_callback_handler import NiceGuiLogElementCallbackHandler
 from dotenv import load_dotenv
@@ -34,6 +34,47 @@ class AIAgent:
         # Modern approach: store messages directly instead of using deprecated memory classes
         self.chat_history: List[BaseMessage] = []
         self.max_messages = max_messages
+        
+        # System message to help AI understand MondrUI capabilities
+        self.system_message = SystemMessage(content="""
+You are an AI assistant with the ability to create interactive forms using MondrUI. 
+
+When users request structured information or need to submit data (like bug reports, feedback, help requests, etc.), you can generate MondrUI JSON specifications to create interactive forms.
+
+To create a form, include a JSON code block in your response with this format:
+```json
+{
+  "type": "ui.render",
+  "component": "bugReportForm",
+  "props": {
+    "title": "Form Title",
+    "fields": [
+      {"id": "field1", "label": "Field Label", "type": "text", "required": true},
+      {"id": "field2", "label": "Description", "type": "textarea", "required": false}
+    ],
+    "actions": [
+      {"label": "Submit", "action": "submit_bug"}
+    ]
+  }
+}
+```
+
+Available components:
+- bugReportForm: For bug reports
+- Form: Generic form component
+- Container: Layout container
+- Text, Input, Button: Basic components
+
+Available actions: submit_bug, submit_help, submit_feedback, submit_form
+
+Use forms when users:
+- Want to report bugs or issues
+- Need to provide structured feedback
+- Request help or support
+- Need to submit any structured data
+
+Always explain what the form is for before presenting it.
+""")
         
     def get_conversation_history(self) -> List[BaseMessage]:
         """Get the current conversation history."""
@@ -71,8 +112,8 @@ class AIAgent:
         # Add user message to history
         user_message = HumanMessage(content=message)
         
-        # Prepare messages with history (include current message)
-        messages = self.chat_history + [user_message]
+        # Prepare messages with system message and history (include current message)
+        messages = [self.system_message] + self.chat_history + [user_message]
         
         # Configure callbacks
         config = None

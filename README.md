@@ -17,6 +17,16 @@ For detailed information about the MondrUI specification and concept, see: [Mond
 - **Real-time Chat**: Modern AI chat with conversational memory
 - **Type Safety**: Full type annotations and comprehensive testing
 
+## Demo results
+
+1. The chat resulting the form rendering and processing of result:
+
+![Chat](images/form.png)
+
+2. The rendered form
+
+![Chat](images/formshown.png)
+
 ## Installation
 
 This project uses [uv](https://github.com/astral-sh/uv) for dependency management. Make sure you have `uv` installed:
@@ -204,7 +214,23 @@ The project includes 23+ comprehensive tests covering:
 
 All tests pass and provide excellent coverage of the MondrUI system.
 
+## Acknowledgements 
 
+This project would not have been possible without the incredible work of the [NiceGUI](https://nicegui.io/) team and community. NiceGUI makes it possible to create really great user interfaces with little effort and without any JavaScript development - everything stays in Python! This approach perfectly aligns with MondrUI's goal of making dynamic UI generation accessible and maintainable.
+
+Special thanks to:
+
+- **[NiceGUI Framework](https://nicegui.io/)**: For providing an elegant Python-based web UI framework that eliminates the complexity of frontend development while maintaining full flexibility and power.
+
+- **[Chat with AI Example](https://github.com/zauberzeug/nicegui/tree/main/examples/chat_with_ai)**: The foundation for our `main.py` implementation. This excellent example provided the perfect starting point for integrating conversational AI with dynamic UI generation.
+
+- **The NiceGUI Community**: For creating comprehensive examples, documentation, and support that made this project development smooth and enjoyable.
+
+- **Zauberzeug Team**: For their vision of making web UI development accessible to Python developers everywhere.
+
+- **Open Source Contributors**: To everyone who contributes to making Python-based web development better.
+
+The beauty of MondrUI lies in its simplicity - just like NiceGUI itself. No webpack, no npm, no complex build processes - just Python code that creates beautiful, interactive web applications. This project demonstrates how powerful this approach can be when combined with modern AI capabilities.
 
 ## Contributing
 
