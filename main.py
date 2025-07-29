@@ -60,17 +60,27 @@ def main():
                 memory_display.clear()
                 with memory_display:
                     messages = ai_agent.get_conversation_history()
+                    stats = ai_agent.get_memory_stats()
+                    
                     if not messages:
                         ui.label('No conversation history').classes('text-gray-500 italic')
                     else:
-                        ui.label(f'Total messages: {len(messages)}').classes('text-sm text-gray-600 mb-2')
+                        # Display memory statistics
+                        with ui.card().classes('mb-4 p-3 bg-blue-50'):
+                            ui.label('Memory Statistics').classes('font-bold text-sm mb-2')
+                            ui.label(f'Conversation turns: {stats["conversation_turns"]}').classes('text-sm')
+                            ui.label(f'Total messages: {stats["total_messages"]} / {stats["max_messages"]}').classes('text-sm')
+                            ui.label(f'Memory usage: {stats["memory_usage_percent"]:.1f}%').classes('text-sm')
+                        
+                        # Display conversation history
+                        ui.label('Conversation History:').classes('font-bold text-sm mb-2')
                         for i, msg in enumerate(messages):
                             with ui.card().classes('mb-2 p-3'):
-                                if hasattr(msg, 'type'):
-                                    msg_type = "Human" if msg.type == "human" else "AI"
-                                else:
-                                    msg_type = "Human" if i % 2 == 0 else "AI"
-                                ui.label(f'{msg_type}:').classes('font-bold text-sm')
+                                # Check message type using isinstance
+                                from ai import HumanMessage
+                                msg_type = "Human" if isinstance(msg, HumanMessage) else "AI"
+                                timestamp = f"Message {i+1}"
+                                ui.label(f'{timestamp} - {msg_type}:').classes('font-bold text-sm text-blue-600')
                                 ui.markdown(str(msg.content)).classes('mt-1')
             
             ui.button('Refresh Memory View', on_click=update_memory_display).classes('mb-4')
