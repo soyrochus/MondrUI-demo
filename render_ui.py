@@ -175,7 +175,7 @@ def setup_chat_interface_demo():
             ui.label(f'❌ Chat interface error: {str(e)}').classes('text-red-600 text-sm')
 
 
-async def main():
+def main():
     """Main function to set up all demos."""
     
     # Set up the page
@@ -210,6 +210,9 @@ inputs, text elements, and custom components that you can define and register.
 
 
 if __name__ == '__main__':
+    # Call main to set up the UI before running
+    main()
+    
     ui.run(
         title='MondrUI Demo',
         favicon='🎨',
