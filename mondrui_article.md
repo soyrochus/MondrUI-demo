@@ -27,7 +27,7 @@ This approach enforces clear architectural separation:
 
 * **UI Rendering Engine:** Receives these instructions and renders the interactive interface accordingly, using a registry of reusable components.
 
-## By enforcing this separation, we gain **flexibility, safety, and reusability**. The AI never writes imperative code. It simply emits structured, declarative specifications, while the rendering engine ensures consistency and compliance with organizational standards.
+By enforcing this separation, we gain **flexibility, safety, and reusability**. The AI never writes imperative code. It simply emits structured, declarative specifications, while the rendering engine ensures consistency and compliance with organizational standards.
 
 ## Ensuring Consistency: Templates and Rules
 
