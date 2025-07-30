@@ -104,6 +104,55 @@ This pattern enables a truly **adaptive, intent-driven user experience**:
 
 Conversational UI is not just about making chatbots smarter—it’s about merging the flexibility of natural language with the precision of structured interfaces, without sacrificing control or consistency. The result is a more intelligent, user-centric interaction paradigm.
 
+
+## From Forms to Tools—and Beyond: The Next Phase of MondrUI
+
+With the initial prototype of MondrUI, as documented in this repository, we have demonstrated a baseline for dynamically defined forms. The system supports both pre-registered and AI-generated form definitions, enabling structured, conversational data collection. The prototype is intended to show that AI-driven UI generation can move beyond static web forms and adapt in real time to user intent and context.
+
+This is only an initial step. The next area for experimentation is action: moving from data entry to dynamic operations, mediated by the AI.
+
+### Tool Integration: Making UIs Actionable
+
+To move beyond forms, the next logical step for MondrUI is to enable simple actions—integrating *tools* that can be invoked by the AI and surfaced as interactive UI elements.
+
+There are two principal experimental directions:
+
+1. **MCP (Model Context Protocol) Tooling**:
+   By connecting to MCP-compatible components, MondrUI could expose various tools that represent semantically rich operations. Using knowledge of each tool's schema, the AI could dynamically generate appropriate forms for tool input and present results, all within the same conversational context.
+
+2. **Direct API Integration**:
+   Where MCP is not an option, MondrUI could integrate with direct APIs (for example, those with OpenAPI schemas). The same mechanism would apply: the AI translates API contracts into simple, actionable UI components.
+
+This design approach allows MondrUI to serve as a proving ground for the automated generation of UI over a growing set of tools—testing the feasibility of dynamic interface generation for more than just data collection.
+
+### Flows: Orchestrating Cognitive Processes
+
+Once the prototype can invoke tools, the next technical milestone is *flow composition*. Here, a flow means a sequence or graph of actions, orchestrated in response to a user's intent.
+
+For example:
+A user expresses, “I want to report a bug.”
+
+* The AI, using MondrUI, generates a form for the relevant bug tracker (e.g., JIRA).
+* On submission, MondrUI invokes the relevant API or tool to create the ticket.
+* The AI might prompt for additional steps, such as attaching files or notifying others.
+
+These flows are not statically programmed—they can be composed dynamically, based on what tools and schemas are available. The experiment is to see how far this approach can go in practice.
+
+### Where We Are—and What Comes Next
+
+* **Current State:**
+  The repository contains a working demonstration of dynamic form generation and basic conversational UI. The infrastructure for pluggable schemas and data-driven forms is in place, with limited scope.
+
+* **Next Steps:**
+
+  1. **Tool Layer:** Prototype integration of MCP-compatible or OpenAPI-described tools, defining contracts for tool schemas and building adapters to invoke tool logic.
+  2. **Dynamic UI over Tools:** Extend current logic to cover tool invocation, so the AI can generate actionable interfaces, not just static forms.
+  3. **Flow Composition:** Prototype a minimal flow engine to let the AI sequence tools and forms into basic workflows, experimenting with orchestration and feedback.
+
+MondrUI remains a research and prototyping area. Its purpose is to test concepts and technical feasibility—serving as a foundation for future, more robust implementations elsewhere. The next phase will focus on connecting data entry, tool invocation, and simple process flows, and learning from the results.
+
+
+
 ## Appendix: Complete MondrUI Schema Example
 
 Below is a full **MondrUI DSL example** describing a ChatGPT-like conversational UI, including a sidebar with new chat button, search input, and a conversation list, alongside the main chat area.
